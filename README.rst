@@ -17,6 +17,8 @@ available parameters available at each endpoint this package is intended to
 be used by your application to build your own abstractions on top of the
 request and response data.
 
+To get started, supply your credentials.
+
 .. code-block:: python
 
     import mediaamp
