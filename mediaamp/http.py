@@ -37,9 +37,10 @@ def request_json(method,
     exceptions.
 
     """
-    if ma.current_token is None and not is_signin_request:
+    if ma.current_token is not None:
+        session.auth = HTTPBasicAuth('', ma.current_token)
+    elif not is_signin_request:
         sign_in(ma.token_duration, ma.token_idle_timeout)
-    session.auth = HTTPBasicAuth('', ma.current_token)
     response = getattr(session, method)(url, **kwargs)
     try:
         response.raise_for_status()
@@ -101,6 +102,7 @@ def resolve_domain_for_account(account_id):
 
 
 def sign_in(duration=43200000, idle_timeout=14400000):
+    ma.current_token = None
     session.auth = HTTPBasicAuth(signin_username(), ma.password)
     result = get(
         SIGN_IN_URL.format(tld=regional_tld()),
