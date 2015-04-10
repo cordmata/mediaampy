@@ -32,11 +32,11 @@ def wrap_http_error(error):
 
 
 http_status_map = defaultdict(lambda: MediaAmpError)
-for code in xrange(400, 500):
+for code in range(400, 500):
     http_status_map[code] = ClientError
 for code in (401, 403):
     http_status_map[code] = AuthenticationError
-for code in xrange(500, 600):
+for code in range(500, 600):
     http_status_map[code] = ServerError
 
 
