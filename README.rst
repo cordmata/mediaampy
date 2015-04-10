@@ -3,19 +3,15 @@ MediaAmp/MPX HTTP API Client
 
 This is a fairly low-level wrapper around the MediaAmp/MPX `endpoints
 <http://help.theplatform.com/display/trc/Alphabetical+list+of+endpoints>`_
-provided by theplatform.com. It primarily handles token authentication
-and provides HTTP methods with configurable default parameters (e.g. schema)
-for the service endpoints. Currently it only supports the JSON (and cJSON)
-forms.
+provided by theplatform.com. It primarily handles token authentication and
+provides HTTP methods with configurable default parameters (e.g. schema) for the
+service endpoints. Because of the multitude of available parameters available at
+each endpoint this package is intended to be used by your application to build
+your own abstractions on top of the request and response data. Currently it only
+supports the JSON (and cJSON) forms.
 
 Usage
 -----
-
-This only really provides HTTP methods against known service endpoint URLs
-with some common default parameters applied. Because of the multitude of
-available parameters available at each endpoint this package is intended to
-be used by your application to build your own abstractions on top of the
-request and response data.
 
 To get started, supply your credentials.
 
