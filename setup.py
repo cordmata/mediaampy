@@ -16,7 +16,7 @@ with open('README.rst', 'r', 'utf-8') as f:
     readme = f.read()
 
 setup(
-    name='mediaamp',
+    name='mediaampy',
     version=version,
     description='HTTP Client for the MediaAmp/MPX API',
     long_description=readme,
