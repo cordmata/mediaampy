@@ -10,6 +10,9 @@ each endpoint this package is intended to be used by your application to build
 your own abstractions on top of the request and response data. Currently it only
 supports the JSON (and cJSON) forms.
 
+.. image:: https://travis-ci.org/cordmata/mediaampy.svg?branch=master
+    :target: https://travis-ci.org/cordmata/mediaampy
+
 Usage
 -----
 
