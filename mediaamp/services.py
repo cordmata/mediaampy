@@ -7,14 +7,17 @@ from .exceptions import ServiceNotAvailable
 _account_registries = {}  # cache
 
 
-def for_account(account_id):
+def for_account(account_id, use_ssl=True):
     """Get the services available to the specified account."""
     if account_id in _account_registries:
         url_map = _account_registries[account_id]
     else:
         url_map = http.resolve_domain_for_account(account_id)
         _account_registries[account_id] = url_map
-    return Registry(url_map)
+    if use_ssl:
+        return SecureRegistry(url_map)
+    else:
+        return Registry(url_map)
 
 
 class Endpoint(object):
@@ -443,3 +446,16 @@ class Registry(object):
         D('ValidationRule'),
         D('Validator'),
     )
+
+
+class SecureRegistry(Registry):
+
+    def __init__(self, *args, **kwargs):
+        super(SecureRegistry, self).__init__(*args, **kwargs)
+        self._ensure_https_urls()
+
+    def _ensure_https_urls(self):
+        self.url_map = {
+            k: v.replace('http://', 'https://')
+            for k, v in self.url_map.items()
+        }

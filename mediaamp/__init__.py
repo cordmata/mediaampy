@@ -1,5 +1,8 @@
 __version__ = '0.1'
 
+from . import services, http, exceptions  # noqa
+
+
 # configuration variables
 username = None
 password = None

@@ -86,7 +86,7 @@ def delete(url, **kwargs):
 #
 ##############################################################################
 SIGN_IN_URL = 'https://identity.auth.theplatform.{tld}/idm/web/Authentication/signIn'
-REGISTRY_URL = 'http://access.auth.theplatform.{tld}/web/Registry/resolveDomain'
+REGISTRY_URL = 'https://access.auth.theplatform.{tld}/web/Registry/resolveDomain'
 
 
 def resolve_domain_for_account(account_id):
