@@ -11,10 +11,10 @@ url = 'http://example.com'
 
 
 def test_service():
-    s = Service('HAS_KEY', Endpoint('Test'))
+    s = Service(url, Endpoint('Test'))
     assert isinstance(s['Test'], Endpoint)
-    assert s['Test'].resource_name == 'Test'
-    assert s(True).read_only is True
+    assert s.Test.resource_name == 'Test'
+    assert s.Test.base_url == url
 
 
 def test_endpoint():
@@ -35,16 +35,17 @@ def test_registry():
         'Cue Point Data Service': url,
     }
     r = Registry(url_map)
-    account = r.AccountData
+    account = r.Account_Data_Service
     assert isinstance(account, Service)
-    endpoint = account['Account']
+    endpoint = account.Account
     assert isinstance(endpoint, Endpoint)
     assert endpoint.base_url == url
     assert endpoint.url == url + '/data/Account'
-    with pytest.raises(ServiceNotAvailable):
-        r.AccessData['Permission']
-    cps = r.CuePointData['CuePoint']
+    with pytest.raises(AttributeError):
+        r.access_data_service.Permission
+    cps = r['Cue Point Data Service'].CuePoint
     assert cps.url == url + '/CuePoint'
+    assert isinstance(r['Account Data Service'].Notifications, Endpoint)
 
 
 def test_domain_changes():

@@ -35,28 +35,33 @@ on the "About" screen in the MPX console.
 
     services = mediamp.services.for_account('{{ ACCOUNT ID }}')
 
-Once initialized, you can obtain endpoints from the services available on
-the service object. Each endpoint has get(), put(), post(), and delete()
+Once initialized, you can obtain services from the registry by key lookup or
+attribute lookup. The following are equivalent:
+
+.. code-block:: python
+
+    media_data = services['Media Data Service']
+    media_data = services.media_data_service
+    media_data = services.Media_Data_Service
+    media_data = services.MEDIA_DATA_SERVICE
+
+The endpoints can be obtained from the services in the same manner from
+the service object, except they are case sensitive .
+Each endpoint has get(), put(), post(), and delete()
 methods you can use depending on the actions you are taking.
 
 .. code-block:: python
 
-    media = services.MediaData['Media']
-    stuff = media.get('byCategory', params={'categoryId': 'Something'})
+    all_media = media_data.Media.get()
+    all_media = media_data['Media'].get()
 
 You can specify your own defaults per-endpoint by calling the endpoint
 object.
 
 .. code-block:: python
 
-    media = services.MediaData['Media'](my_new_param='hello')
+    media = services.Media_Data_Service.Media(my_new_param='hello')
 
-If you prefer the read-only version of an endpoint (if available) you can
-specify that when obtaining the service.
-
-.. code-block:: python
-
-    services.Feeds(read_only=True)['Feed']
 
 Installation
 ------------
