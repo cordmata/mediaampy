@@ -41,7 +41,7 @@ for code in range(500, 600):
 
 
 def raise_for_json_exception(data):
-    if data.get('isException'):
+    if isinstance(data, dict) and data.get('isException'):
         status_code = data.get('responseCode', 400)
         description = data.get('description', 'Bad Request')
         title = data.get('title')
