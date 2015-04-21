@@ -1,5 +1,4 @@
 mock
 pytest
 requests
-six
 wheel

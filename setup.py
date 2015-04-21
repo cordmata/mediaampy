@@ -23,7 +23,7 @@ setup(
     author='Matt Cordial',
     url='https://github.com/cordmata/mediaampy',
     packages=find_packages(),
-    install_requires=['requests', 'six'],
+    install_requires=['requests'],
     license='Apache 2.0',
     keywords=('MediaAmp', 'thePlatform'),
     classifiers=(
