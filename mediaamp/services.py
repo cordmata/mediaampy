@@ -1,55 +1,31 @@
 from functools import partial
-from posixpath import join as urljoin
+import re
+from .exceptions import ServiceNotAvailable
 
-from . import http
+services = {}
 
-_account_registries = {}  # cache
-
-
-def for_account(account_id, use_ssl=True):
-    """Get the services available to the specified account."""
-    if account_id in _account_registries:
-        url_map = _account_registries[account_id]
-    else:
-        url_map = http.resolve_domain_for_account(account_id)
-        _account_registries[account_id] = url_map
-    if use_ssl:
-        return SecureRegistry(url_map)
-    else:
-        return Registry(url_map)
+def register(cls):
+    if issubclass(cls, BaseService):
+        key = getattr(cls, 'registry_key', None)
+        if not key:
+            key = ' '.join(re.findall('[A-Z][^A-Z]*', cls.__name__))
+        services[key] = cls
 
 
 class Endpoint(object):
-    def __init__(self,
-                 name,
-                 base_url=None,
-                 path=None,
-                 resource_name=None,
-                 **kwargs):
+
+    def __init__(self, path=None, name=None, service=None, **kwargs):
+        self.path = path
         self.name = name
-        self.base_url = base_url
-        self.path = path or ''
-        self.resource_name = name if resource_name is None else resource_name
+        self.service = service
         self.default_params = kwargs.copy()
         self.default_params.setdefault('schema', '1.0')
 
-    def __call__(self, **kwargs):
-        """ Override default URL parameters.
-
-        Allow custom overrides of defaults to look like object
-        initialization.
-
-        """
-        self.default_params.update(kwargs)
-        return self
-
-    @property
-    def url(self):
-        return urljoin(
-            self.base_url,
-            self.path.lstrip('/'),
-            self.resource_name.lstrip('/')
-        ).rstrip('/')
+    def urljoin(self, *args):
+        parts = (self.service.base_url, self.path, self.name) + args
+        return '/'.join([
+            part.lstrip('/') for part in parts if part is not None
+        ]).rstrip('/')
 
     def get(self, extra_path=None, **kwargs):
         return self._make_request('get', extra_path, **kwargs)
@@ -66,424 +42,377 @@ class Endpoint(object):
     def _make_request(self, method, extra_path=None, **kwargs):
         # merge default parameters with those supplied
         params = dict(self.default_params, **kwargs.pop('params', {}))
-        extra_path = extra_path or ''
-        url = urljoin(self.url, extra_path).rstrip('/')
-        return http.request_json(method, url, params=params, **kwargs)
+        extra_path = extra_path
+        url = self.urljoin(extra_path)
+        return self.service.session.request_json(method, url, params=params, **kwargs)
+
+    def __call__(self, **kwargs):
+        """ Override default URL parameters.
+
+        Allow custom overrides of defaults to look like object
+        initialization.
+
+        """
+        self.default_params.update(kwargs)
+        return self
 
 
-class Service(object):
+class BaseService(object):
 
-    def __init__(self, base_url, *endpoints, **kwargs):
+    def __init__(self, session, base_url):
+        self.session = session
         self.base_url = base_url
-        self.endpoints = {e.name: e for e in endpoints}
-        for e in self.endpoints.values():
-            e.base_url = self.base_url
+        self.init_endpoints()
+
+    def init_endpoints(self):
+        for k, v in self.__class__.__dict__.items():
+            if isinstance(v, Endpoint):
+                v.service = self
+                v(account=self.session.account)
+                if v.name is None:
+                    v.name = k
 
     @property
     def Notifications(self):
-        return Endpoint('notify', self.base_url)
-
-    def __getitem__(self, name):
-        return self.endpoints[name]
-
-    def __getattr__(self, name):
-        try:
-            return self[name]
-        except KeyError:
-            raise AttributeError('Endpoint not found.')
-
-    def __repr__(self):
-        return 'Service()[{endpoint_names}]'.format(
-            endpoint_names=', '.join(self.endpoints.keys())
-        )
+        return Endpoint(name='notify', service=self, account=self.session.account)
 
 
-class Registry(object):
-    _services = {}
-
-    @classmethod
-    def register(cls, service_name, *endpoints):
-        cls._services[cls.normalize_name(service_name)] = endpoints
-
-    @staticmethod
-    def normalize_name(name):
-        return name.lower().replace(' ', '_')
-
-    def __init__(self, url_map):
-        self.url_map = {
-            self.normalize_name(k): v
-            for k, v in url_map.items()
-        }
-
-    def __getitem__(self, name):
-        name = self.normalize_name(name)
-        endpoints = self._services[name]
-        url = self.url_map.get(name)
-        if url is None:
-            url = self.url_map.get(name + ' read-only')
-        if url is None:
-            raise KeyError('Service not found')
-        return Service(url, *endpoints)
-
-    def __getattr__(self, name):
-        try:
-            return self[name]
-        except KeyError:
-            raise AttributeError('Service not found')
+DataEndpoint = partial(Endpoint, path='data')
+BusinessEndpoint = partial(Endpoint, path='web')
 
 
-class SecureRegistry(Registry):
-
-    def __init__(self, *args, **kwargs):
-        super(SecureRegistry, self).__init__(*args, **kwargs)
-        self._ensure_https_urls()
-
-    def _ensure_https_urls(self):
-        self.url_map = {
-            k: v.replace('http://', 'https://')
-            for k, v in self.url_map.items()
-        }
+@register
+class AccessDataService(BaseService):
+    Permission = DataEndpoint()
+    Role = DataEndpoint()
+    Authorization = BusinessEndpoint()
+    Lookup = BusinessEndpoint()
+    Registry = BusinessEndpoint()
 
 
-E = Endpoint
-D = partial(Endpoint, path='data')  # DataEndpoint
-B = partial(Endpoint, path='web')   # BusinessEndpoint
+@register
+class AccountDataService(BaseService):
+    Account = DataEndpoint()
 
 
-Registry.register(
-    'Access Data Service',
-    D('Permission'),
-    D('Role'),
-    B('Authorization', schema='1.3'),
-    B('Lookup'),
-    B('Registry'),
-)
+@register
+class CommerceConfigurationDataService(BaseService):
+    CommerceRegistry = DataEndpoint()
+    CheckoutConfiguration = DataEndpoint()
+    FulfillmentConfiguration = DataEndpoint()
+    PaymentConfiguration = DataEndpoint()
+    Rule = DataEndpoint()
+    RuleSet = DataEndpoint()
+    TaxConfiguration = DataEndpoint()
+
+@register
+class CommerceEventDataService(BaseService):
+    OrderTracking = DataEndpoint()
 
 
-Registry.register(
-    'Account Data Service',
-    D('Account')
-)
+@register
+class CuePointDataService(BaseService):
+    CuePoint = Endpoint()
+    CuePointType = Endpoint()
 
-Registry.register(
-    'Commerce Configuration Data Service',
-    D('CommerceRegistry'),
-    D('CheckoutConfiguration'),
-    D('FulfillmentConfiguration'),
-    D('PaymentConfiguration'),
-    D('Rule'),
-    D('RuleSet'),
-    D('TaxConfiguration'),
-)
 
-Registry.register(
-    'Commerce Event Data Service',
-    D('OrderTracking'),
-)
+@register
+class DeliveryDataService(BaseService):
+    AccountSettings = DataEndpoint()
+    AdPolicy = DataEndpoint()
+    Restriction = DataEndpoint()
+    UserAgent = DataEndpoint()
 
-Registry.register(
-    'Cue Point Data Service',
-    E('CuePoint'),
-    E('CuePointType'),
-)
 
-Registry.register(
-    'Delivery Data Service',
-    D('AccountSettings'),
-    D('AdPolicy'),
-    D('Restriction'),
-    D('UserAgent'),
-)
+@register
+class EndUserDataService(BaseService):
+    Directory = DataEndpoint()
+    Security = DataEndpoint()
+    User = DataEndpoint()
+    Authentication = BusinessEndpoint()
+    Lookup = BusinessEndpoint()
+    Self = BusinessEndpoint()
 
-Registry.register(
-    'End User Data Service',
-    D('Directory'),
-    D('Security'),
-    D('User'),
-    B('Authentication'),
-    B('Lookup'),
-    B('Self'),
-)
 
-Registry.register(
-    'Entertainment Data Service',
-    D('AccountSettings'),
-    D('Channel'),
-    D('ChannelSchedule'),
-    D('Company'),
-    D('Credit'),
-    D('Listing'),
-    D('Location'),
-    D('Person'),
-    D('Program'),
-    D('ProgramAvailability'),
-    D('Station'),
-    D('Tag'),
-    D('TvSeason'),
-)
+@register
+class EntertainmentDataService(BaseService):
+    AccountSettings = DataEndpoint()
+    Channel = DataEndpoint()
+    ChannelSchedule = DataEndpoint()
+    Company = DataEndpoint()
+    Credit = DataEndpoint()
+    Listing = DataEndpoint()
+    Location = DataEndpoint()
+    Person = DataEndpoint()
+    Program = DataEndpoint()
+    ProgramAvailability = DataEndpoint()
+    Station = DataEndpoint()
+    Tag = DataEndpoint()
+    TvSeason = DataEndpoint()
 
-Registry.register(
-    'Entertainment Ingest Data Service',
-    D('IngestConfig'),
-    D('IngestResult'),
-    B('Process'),
-)
 
-Registry.register(
-    'Entertainment Feeds Service',
-    E('Feed', resource_name=''),
-)
+@register
+class EntertainmentIngestDataService(BaseService):
+    IngestConfig = DataEndpoint()
+    IngestResult = DataEndpoint()
+    Process = BusinessEndpoint()
 
-Registry.register(
-    'Entitlement Data Service',
-    D('AccountSettings'),
-    D('Adapter'),
-    D('AdapterConfiguration'),
-    D('Device'),
-    D('DistributionRight'),
-    D('DistributionRightLicenseCount'),
-    D('Entitlement'),
-    D('LicenseCount'),
-    D('PhysicalDevice'),
-    D('ProductDevice'),
-    D('Rights'),
-    D('SubjectPolicy'),
-    D('UserDevice'),
-)
 
-Registry.register(
-    'Entitlement Web Service',
-    B('Entitlements'),
-    B('RegisterDevice'),
-)
+@register
+class EntertainmentFeedsService(BaseService):
+    Feed = Endpoint(name='')
 
-Registry.register(
-    'Entitlement License Service',
-    B('ContentAccessRules', schema='1.2'),
-    B('License', schema='2.5'),
-)
 
-Registry.register(
-    'FeedReader Data Service',
-    D('FeedRecord'),
-)
+@register
+class EntitlementDataService(BaseService):
+    AccountSettings = DataEndpoint()
+    Adapter = DataEndpoint()
+    AdapterConfiguration = DataEndpoint()
+    Device = DataEndpoint()
+    DistributionRight = DataEndpoint()
+    DistributionRightLicenseCount = DataEndpoint()
+    Entitlement = DataEndpoint()
+    LicenseCount = DataEndpoint()
+    PhysicalDevice = DataEndpoint()
+    ProductDevice = DataEndpoint()
+    Rights = DataEndpoint()
+    SubjectPolicy = DataEndpoint()
+    UserDevice = DataEndpoint()
 
-Registry.register(
-    'FeedReader Data Service',
-    D('FeedAdapter'),
-    D('FeedConfig'),
-)
 
-Registry.register(
-    'Feeds Service',
-    E('Feed', resource_name=''),
-)
+@register
+class EntitlementWebService(BaseService):
+    Entitlements = BusinessEndpoint()
+    RegisterDevice = BusinessEndpoint()
 
-Registry.register(
-    'File Management Service',
-    B('FileManagement'),
-)
 
-Registry.register(
-    'Ingest Data Service',
-    D('Adapter'),
-    D('AdapterConfiguration'),
-    D('Checksum'),
-)
+@register
+class EntitlementLicenseService(BaseService):
+    ContentAccessRules = BusinessEndpoint(schema='1.2')
+    License = BusinessEndpoint(schema='2.5')
 
-Registry.register(
-    'Ingest Service',
-    E('ingest'),
-    E('test')
-)
 
-Registry.register(
-    'Key Data Service',
-    D('Key'),
-    D('UserKey'),
-)
+@register
+class FeedReaderDataService(BaseService):
+    registry_key = 'FeedReader Data Service'
+    FeedRecord = DataEndpoint()
 
-Registry.register(
-    'Ledger Data Service',
-    D('LedgerEntry')
-)
 
-Registry.register(
-    'Live Event Data Service',
-    D('LiveEncoder'),
-    D('LiveEvent'),
-)
+@register
+class FeedsDataService(BaseService):
+    FeedAdapter = DataEndpoint()
+    FeedConfig = DataEndpoint()
 
-Registry.register(
-    'Live Event Service',
-    B('Scheduling'),
-)
 
-Registry.register(
-    'Media Data Service',
-    D('AccountSettings'),
-    D('AssetType'),
-    D('Category'),
-    D('Media'),
-    D('MediaDefaults'),
-    D('MediaFile'),
-    D('Provider'),
-    D('Release'),
-    D('Server'),
-)
+@register
+class FeedsService(BaseService):
+    Feed = Endpoint(name='')
 
-Registry.register(
-    'Message Data Service',
-    D('EmailTemplate'),
-    D('MessageInstruction'),
-    D('MessageQueue'),
-    D('NotificationFilter'),
-)
 
-Registry.register(
-    'Player Service',
-    E('Player', resource_name='p'),
-)
+@register
+class FileManagementService(BaseService):
+    FileManagement = BusinessEndpoint()
 
-Registry.register(
-    'Player Data Service',
-    D('AccountSettings'),
-    D('ColorScheme'),
-    D('Layout'),
-    D('Player'),
-    D('PlugIn'),
-    D('Skin'),
-)
 
-Registry.register(
-    'Product Feeds Service',
-    E('Feed', resource_name='')
-)
+@register
+class IngestDataService(BaseService):
+    Adapter = DataEndpoint()
+    AdapterConfiguration = DataEndpoint()
+    Checksum = DataEndpoint()
 
-Registry.register(
-    'Product Data Service',
-    D('AccountSettings'),
-    D('PricingTemplate'),
-    D('Product'),
-    D('ProductTag'),
-    D('Subscription'),
-)
 
-Registry.register(
-    'Promotion Data Service',
-    D('Promotion'),
-    D('PromotionAction'),
-    D('PromotionCode'),
-    D('PromotionCondition'),
-    D('PromotionUseCount'),
-)
+@register
+class IngestService(BaseService):
+    ingest = Endpoint()
+    test = Endpoint()
 
-Registry.register(
-    'Publish Data Service',
-    D('Adapter'),
-    D('AdapterConfiguration'),
-    D('PublishProfile'),
-)
 
-Registry.register(
-    'Publish Service',
-    B('Publish'),
-    B('Sharing'),
-)
+@register
+class KeyDataService(BaseService):
+    Key = DataEndpoint()
+    UserKey = DataEndpoint()
 
-Registry.register('Selector Service', E('Selector', resource_name=''))
 
-Registry.register(
-    'Sharing Data Service',
-    D('OutletProfile'),
-    D('ProviderAdapter'),
-)
+@register
+class LedgerDataService(BaseService):
+    LedgerEntr = DataEndpoint()
 
-Registry.register(
-    'Social Data Service',
-    D('AccountSettings'),
-    D('Comment'),
-    D('Rating'),
-    D('TotalRating'),
-)
 
-Registry.register(
-    'Admin Storefront Service',
-    D('Action'),
-    D('Contract'),
-    D('FulfillmentItem'),
-    D('Order'),
-    D('OrderFulfillment'),
-    D('OrderHistory'),
-    D('OrderItem'),
-    D('OrderSummary'),
-    D('PaymentInstrumentInfo'),
-    D('Shipment'),
-    B('Checkout', schema='1.5'),
-    B('Payment', schema='1.1'),
-)
+@register
+class LiveEventDataService(BaseService):
+    LiveEncoder = DataEndpoint()
+    LiveEvent = DataEndpoint()
 
-Registry.register(
-    'Storefront Service',
-    B('Checkout', schema='1.4'),
-    B('Payment', schema='1.1'),
-    D('OrderHistory'),
-    D('PaymentInstrumentInfo'),
-)
 
-Registry.register(
-    'Task Service',
-    D('Agent'),
-    D('Batch'),
-    D('Task'),
-    D('TaskTemplate'),
-    D('TaskType'),
-)
+@register
+class LiveEventService(BaseService):
+    Scheduling = BusinessEndpoint()
 
-Registry.register(
-    'User Data Service',
-    D('Directory'),
-    D('Security'),
-    D('User'),
-)
 
-Registry.register(
-    'User Data Service',
-    B('Authentication'),
-    B('Lookup'),
-    B('Self'),
-)
+@register
+class MediaDataService(BaseService):
+    AccountSettings = DataEndpoint()
+    AssetType = DataEndpoint()
+    Category = DataEndpoint()
+    Media = DataEndpoint()
+    MediaDefaults = DataEndpoint()
+    MediaFile = DataEndpoint()
+    Provider = DataEndpoint()
+    Release = DataEndpoint()
+    Server = DataEndpoint()
 
-Registry.register(
-    'User Profile Data Service',
-    D('AccountSettings'),
-    D('TotalItem'),
-    D('UserList'),
-    D('UserListItem'),
-    D('UserProfile'),
-)
 
-Registry.register(
-    'Validation Data Service',
-    D('ProfileResult'),
-    D('ProfileStepResult'),
-    D('WorkflowQueue'),
-)
+@register
+class MessageDataService(BaseService):
+    EmailTemplate = DataEndpoint()
+    MessageInstruction = DataEndpoint()
+    MessageQueue = DataEndpoint()
+    NotificationFilter = DataEndpoint()
 
-Registry.register(
-    'Validation Service',
-    B('Validation', schema='1.1')
-)
 
-Registry.register(
-    'WatchFolder Data Service',
-    D('WatchFolder'),
-    D('WatchFolderFile'),
-)
+@register
+class PlayerService(BaseService):
+    Player = Endpoint(name='p')
 
-Registry.register(
-    'Validation Data Service',
-    D('ConditionalRule'),
-    D('ValidationRule'),
-    D('Validator'),
-)
+
+@register
+class PlayerDataService(BaseService):
+    AccountSettings = DataEndpoint()
+    ColorScheme = DataEndpoint()
+    Layout = DataEndpoint()
+    Player = DataEndpoint()
+    PlugIn = DataEndpoint()
+    Skin = DataEndpoint()
+
+
+@register
+class ProductFeedsService(BaseService):
+    Feed = Endpoint(name='')
+
+
+@register
+class ProductDataService(BaseService):
+    AccountSettings = DataEndpoint()
+    PricingTemplate = DataEndpoint()
+    Product = DataEndpoint()
+    ProductTag = DataEndpoint()
+    Subscription = DataEndpoint()
+
+
+@register
+class PromotionDataService(BaseService):
+    Promotion = DataEndpoint()
+    PromotionAction = DataEndpoint()
+    PromotionCode = DataEndpoint()
+    PromotionCondition = DataEndpoint()
+    PromotionUseCount = DataEndpoint()
+
+
+@register
+class PublishDataService(BaseService):
+    Adapter = DataEndpoint()
+    AdapterConfiguration = DataEndpoint()
+    PublishProfile = DataEndpoint()
+
+
+@register
+class PublishService(BaseService):
+    Publish = BusinessEndpoint()
+    Sharing = BusinessEndpoint()
+
+
+@register
+class SelectorService(BaseService):
+    Selector = Endpoint(name='')
+
+
+@register
+class SharingDataService(BaseService):
+    OutletProfile = DataEndpoint()
+    ProviderAdapter = DataEndpoint()
+
+
+@register
+class SocialDataService(BaseService):
+    AccountSettings = DataEndpoint()
+    Comment = DataEndpoint()
+    Rating = DataEndpoint()
+    TotalRating = DataEndpoint()
+
+
+@register
+class AdminStorefrontService(BaseService):
+    Action = DataEndpoint()
+    Contract = DataEndpoint()
+    FulfillmentItem = DataEndpoint()
+    Order = DataEndpoint()
+    OrderFulfillment = DataEndpoint()
+    OrderHistory = DataEndpoint()
+    OrderItem = DataEndpoint()
+    OrderSummary = DataEndpoint()
+    PaymentInstrumentInfo = DataEndpoint()
+    Shipment = DataEndpoint()
+    Checkout = BusinessEndpoint(schema='1.5')
+    Payment = BusinessEndpoint(schema='1.1')
+
+
+@register
+class StorefrontService(BaseService):
+    Checkout = BusinessEndpoint(schema='1.4')
+    Payment = BusinessEndpoint(schema='1.1')
+    OrderHistory = DataEndpoint()
+    PaymentInstrumentInfo = DataEndpoint()
+
+
+@register
+class TaskService(BaseService):
+    Agent = DataEndpoint()
+    Batch = DataEndpoint()
+    Task = DataEndpoint()
+    TaskTemplate = DataEndpoint()
+    TaskType = DataEndpoint()
+
+
+@register
+class UserDataService(BaseService):
+    Directory = DataEndpoint()
+    Security = DataEndpoint()
+    User = DataEndpoint()
+    Authentication = BusinessEndpoint()
+    Lookup = BusinessEndpoint()
+    Self = BusinessEndpoint()
+
+
+@register
+class UserProfileDataService(BaseService):
+    AccountSettings = DataEndpoint()
+    TotalItem = DataEndpoint()
+    UserList = DataEndpoint()
+    UserListItem = DataEndpoint()
+    UserProfile = DataEndpoint()
+
+
+@register
+class ValidationDataService(BaseService):
+    ProfileResult = DataEndpoint()
+    ProfileStepResult = DataEndpoint()
+    WorkflowQueue = DataEndpoint()
+
+
+@register
+class ValidationService(BaseService):
+    Validation = BusinessEndpoint(schema='1.1')
+
+
+@register
+class WatchFolderDataService(BaseService):
+    registry_key = 'WatchFolder Data Service'
+    WatchFolder = DataEndpoint()
+    WatchFolderFile = DataEndpoint()
+
+
+@register
+class ValidationDataService(BaseService):
+    ConditionalRule = DataEndpoint()
+    ValidationRule = DataEndpoint()
+    Validator = DataEndpoint()

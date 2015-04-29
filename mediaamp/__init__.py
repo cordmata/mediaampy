@@ -1,14 +1,4 @@
-__version__ = '0.1.1'
+__version__ = '0.2'
+__title__ = 'mediaampy'
 
-from . import services, http, exceptions  # noqa
-
-
-# configuration variables
-username = None
-password = None
-user_directory = 'mpx'
-region = 'US1'
-token_duration = 43200000       # 12 hours
-token_idle_timeout = 14400000   # 4 hours
-
-current_token = None
+from .http import Session

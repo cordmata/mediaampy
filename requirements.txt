@@ -1,4 +1,7 @@
 mock
 pytest
+appdirs
+pyfscache
+blinker
 requests
 wheel

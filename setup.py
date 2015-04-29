@@ -2,7 +2,6 @@ from codecs import open
 import re
 from setuptools import setup, find_packages
 
-
 version = ''
 version_re = r'^__version__\s*=\s*[\'"]([^\'"]*)[\'"]'
 
@@ -23,7 +22,7 @@ setup(
     author='Matt Cordial',
     url='https://github.com/cordmata/mediaampy',
     packages=find_packages(),
-    install_requires=['requests'],
+    install_requires=['requests', 'appdirs', 'pyfscache', 'blinker'],
     license='Apache 2.0',
     keywords=('MediaAmp', 'thePlatform'),
     classifiers=(
