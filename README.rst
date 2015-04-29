@@ -35,7 +35,7 @@ Once initialized, you can obtain services by key lookup:
 
 .. code-block:: python
 
-    media_data = services['Media Data Service']
+    media_data = session['Media Data Service']
 
 The endpoints on the service have get(), put(), post(), and delete()
 methods you can use depending on the actions you are taking.
