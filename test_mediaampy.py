@@ -27,7 +27,6 @@ def session(registry):
         session.auth_token = auth_token
         session.post_sign_in.send(session)
     session.sign_in = mock.Mock(side_effect=_sign_in)
-    session.cache.purge()
     return session
 
 

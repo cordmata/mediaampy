@@ -42,7 +42,8 @@ methods you can use depending on the actions you are taking.
 
 .. code-block:: python
 
-    all_media = media_data.Media.get('{{MEDIA_ID}}')
+    media_item = media_data.Media.get('{{MEDIA_ID}}')
+    media_item['description']
 
 You can specify your own defaults per-endpoint by calling the endpoint
 object.

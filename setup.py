@@ -22,7 +22,7 @@ setup(
     author='Matt Cordial',
     url='https://github.com/cordmata/mediaampy',
     packages=find_packages(),
-    install_requires=['requests', 'appdirs', 'pyfscache', 'blinker'],
+    install_requires=['requests', 'blinker'],
     license='Apache 2.0',
     keywords=('MediaAmp', 'thePlatform'),
     classifiers=(

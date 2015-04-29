@@ -1,7 +1,4 @@
-from appdirs import user_cache_dir
 from blinker import Signal
-from inspect import isclass
-from pyfscache import FSCache
 import requests
 from requests.auth import HTTPBasicAuth
 
@@ -29,10 +26,11 @@ class Session(object):
                  auth_token=None,
                  user_directory='mpx',
                  region='US1',
+                 service_registry=None,
                  token_duration=43200000,       # 12 hours
                  token_idle_timeout=14400000,   # 4 hours
                  use_ssl=True,
-                 registry_cache_timeout=None):
+                 ):
 
         self.username = username
         self.password = password
@@ -43,12 +41,10 @@ class Session(object):
         self.token_duration = token_duration
         self.token_idle_timeout = token_idle_timeout
         self.use_ssl = use_ssl
-        self.registry_cache_timeout = registry_cache_timeout or {'days': 7}
-        self.cache = FSCache(user_cache_dir(__title__), **self.registry_cache_timeout)
         self.registry_url = REGISTRY_URL.format(tld=self.regional_tld)
         self.signin_url = SIGN_IN_URL.format(tld=self.regional_tld)
         self.post_sign_in = Signal()
-        self._registry = None
+        self._registry = service_registry
         self.session = requests.Session()
         self.session.headers.update({
             'Content-Type': 'application/json',
@@ -59,12 +55,7 @@ class Session(object):
     @property
     def registry(self):
         if self._registry is None:
-            key = 'registry:' + self.account
-            try:
-                self._registry = self.cache[key]
-            except KeyError:
-                self._registry = self.resolve_domain()
-                self.cache[key] = self._registry
+            self._registry = self.resolve_domain()
         return self._registry
 
     @property
