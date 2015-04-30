@@ -1,6 +1,9 @@
 from blinker import Signal
 import requests
+from requests.adapters import HTTPAdapter
 from requests.auth import HTTPBasicAuth
+from requests.packages.urllib3.poolmanager import PoolManager
+import ssl
 
 from . import __version__, __title__
 from .services import services
@@ -153,3 +156,22 @@ class Session(object):
         if self.use_ssl:
             url = url.replace('http://', 'https://')
         return services[key](self, url)
+
+
+class TLS1Adapter(HTTPAdapter):
+    """ Force requests SSL to use TLS 1.
+
+    As of 4/30/2015 thePlatform APIs use TLS 1.2 which causes EOF
+    errors with the default adapter. They are planning to update to
+    SHA-256 certs @ June 15. see:
+
+    https://help.theplatform.com/display/trc/2015+certificate+security+upgrade
+
+    """
+
+    def init_poolmanager(self, connections, maxsize):
+        self.poolmanager = PoolManager(
+            num_pools=connections,
+            maxsize=maxsize,
+            ssl_version=ssl.PROTOCOL_TLSv1
+        )
