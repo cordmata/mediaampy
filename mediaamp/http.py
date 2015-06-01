@@ -49,6 +49,7 @@ class Session(object):
         self.post_sign_in = Signal()
         self._registry = service_registry
         self.session = requests.Session()
+        self.session.mount('https://', TLS1Adapter())
         self.session.headers.update({
             'Content-Type': 'application/json',
             'Accept': 'application/json',
@@ -169,9 +170,10 @@ class TLS1Adapter(HTTPAdapter):
 
     """
 
-    def init_poolmanager(self, connections, maxsize):
+    def init_poolmanager(self, connections, maxsize, block=False):
         self.poolmanager = PoolManager(
             num_pools=connections,
             maxsize=maxsize,
+            block=block,
             ssl_version=ssl.PROTOCOL_TLSv1
         )
