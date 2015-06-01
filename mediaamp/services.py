@@ -393,15 +393,15 @@ class UserProfileDataService(BaseService):
 
 
 @register
-class ValidationDataService(BaseService):
-    ProfileResult = DataEndpoint()
-    ProfileStepResult = DataEndpoint()
-    WorkflowQueue = DataEndpoint()
+class ValidationService(BaseService):
+    Validation = BusinessEndpoint(schema='1.1')
 
 
 @register
-class ValidationService(BaseService):
-    Validation = BusinessEndpoint(schema='1.1')
+class ValidationDataService(BaseService):
+    ConditionalRule = DataEndpoint()
+    ValidationRule = DataEndpoint()
+    Validator = DataEndpoint()
 
 
 @register
@@ -412,7 +412,9 @@ class WatchFolderDataService(BaseService):
 
 
 @register
-class ValidationDataService(BaseService):
-    ConditionalRule = DataEndpoint()
-    ValidationRule = DataEndpoint()
-    Validator = DataEndpoint()
+class WorkflowDataService(BaseService):
+    ProfileResult = DataEndpoint()
+    ProfileStepResult = DataEndpoint()
+    WorkflowQueue = DataEndpoint()
+
+
