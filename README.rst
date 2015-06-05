@@ -56,9 +56,6 @@ object.
 Installation
 ------------
 
-We're currently taking this around the block so it isn't on pypi just yet.
-You can install master (*cough* into a virtualenv) with:
-
 .. code-block:: bash
 
     pip install mediaampy
