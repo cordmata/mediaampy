@@ -61,7 +61,7 @@ You can install master (*cough* into a virtualenv) with:
 
 .. code-block:: bash
 
-    pip install https://github.com/cordmata/mediaampy/archive/master.zip
+    pip install mediaampy
 
 Or you can clone the source and run:
 
