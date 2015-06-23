@@ -1,8 +1,10 @@
+import datetime
 import json
 
 import mediaamp
 from mediaamp.services import BaseService, Endpoint, services
 from mediaamp.exceptions import InvalidTokenError
+from mediaamp.utils import decode_datetime, encode_datetime
 
 import mock
 import pytest
@@ -84,3 +86,10 @@ def test_service_mappings(session):
     reg = session.registry
     for k, v in services.items():
         assert k in reg
+
+
+def test_datetimes():
+    timestamp = 1435037606000
+    dt = decode_datetime(timestamp)
+    assert dt.utcoffset() == datetime.timedelta(0)
+    assert encode_datetime(dt) == timestamp

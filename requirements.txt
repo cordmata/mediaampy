@@ -1,5 +1,6 @@
 mock
 pytest
+pytz
 blinker
 requests
 wheel
