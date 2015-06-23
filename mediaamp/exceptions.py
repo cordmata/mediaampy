@@ -9,6 +9,10 @@ class ClientError(MediaAmpError):
     """Bad request or unauthorized request."""
 
 
+class NotFound(MediaAmpError):
+    """Requested resource not found."""
+
+
 class ServerError(MediaAmpError):
     """Remote server error."""
 
@@ -36,6 +40,7 @@ for code in range(400, 500):
     http_status_map[code] = ClientError
 for code in (401, 403):
     http_status_map[code] = AuthenticationError
+http_status_map[404] = NotFound
 for code in range(500, 600):
     http_status_map[code] = ServerError
 
@@ -55,5 +60,6 @@ def raise_for_json_exception(data):
 
 
 json_error_title_map = {
-    'com.theplatform.authentication.api.exception.InvalidTokenException': InvalidTokenError
+    'com.theplatform.authentication.api.exception.InvalidTokenException': InvalidTokenError,
+    'ObjectNotFoundException': NotFound,
 }
