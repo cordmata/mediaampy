@@ -2,7 +2,7 @@ MediaAmp/MPX HTTP API Client
 ============================
 
 This is a fairly low-level wrapper around the MediaAmp/MPX `endpoints
-<http://help.theplatform.com/display/trc/Alphabetical+list+of+endpoints>`_
+<https://docs.theplatform.com/help/alphabetical-list-of-endpoints>`_
 provided by theplatform.com. It primarily handles token authentication and
 provides HTTP methods with configurable default parameters (e.g. schema) for the
 service endpoints. Because of the multitude of available parameters available at
